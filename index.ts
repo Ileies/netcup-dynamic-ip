@@ -44,6 +44,7 @@ async function updateDnsRecords(configFile: string) {
     const apipassword = config['NETCUP_API_PASSWORD']
     const customernumber = config['NETCUP_CUSTOMER_NUMBER']
     const apikey = config['NETCUP_API_KEY']
+    const hostname = config['NETCUP_HOSTNAME'] ?? '@'
 
     const loginData = await netcupAPI('login', {apipassword, apikey, customernumber})
     const apisessionid = loginData.responsedata?.apisessionid
@@ -55,7 +56,7 @@ async function updateDnsRecords(configFile: string) {
 
     const dnsRecordsData = await netcupAPI('infoDnsRecords', {apikey, customernumber, apisessionid, domainname})
     const ipRecord = dnsRecordsData.responsedata.dnsrecords
-        .find((record: any) => record.type === 'A' && record.hostname === '@')
+        .find((record: any) => record.type === 'A' && record.hostname === hostname)
 
     const oldIp = ipRecord?.destination
 
