@@ -1,20 +1,52 @@
-import {readFile, readdir, writeFile} from 'fs/promises'
-import {basename, join} from 'path'
+import {readFile, writeFile} from 'fs/promises'
 
-// Directory containing server configs
-const configDir = '/etc/secrets/netcup'
-// File to store the previous public IP
+interface Account {
+    apiKey: string
+    apiPassword: string
+    customerNumber: string
+    domains: string[]
+}
+
+type Config = Account[]
+
+const args = process.argv.slice(2)
+let configPath = './config.json'
+for (let i = 0; i < args.length; i++) {
+    if ((args[i] === '--config' || args[i] === '-c') && args[i + 1]) {
+        configPath = args[++i]
+    } else if (!args[i].startsWith('-')) {
+        configPath = args[i]
+    }
+}
+
+let config: Config
+try {
+    config = JSON.parse(await readFile(configPath, 'utf-8'))
+} catch (e) {
+    console.error(`Failed to load config from ${configPath}:`, e)
+    process.exit(1)
+}
+
 const previousIpFile = './ip.txt'
 
 let currentIp: string
-
 try {
     currentIp = (await readFile(previousIpFile, 'utf-8')).trim()
 } catch {
     currentIp = ''
 }
 
-// Function to make requests to the netcup API
+function parseDomain(domain: string): {domainname: string; hostname: string} {
+    const parts = domain.split('.')
+    if (parts.length <= 2) {
+        return {domainname: domain, hostname: '@'}
+    }
+    return {
+        domainname: parts.slice(-2).join('.'),
+        hostname: parts.slice(0, -2).join('.')
+    }
+}
+
 async function netcupAPI(endpoint: string, param: Record<string, any> = {}) {
     const rawData = await fetch('https://ccp.netcup.net/run/webservice/servers/endpoint.php?JSON', {
         method: 'POST',
@@ -26,25 +58,10 @@ async function netcupAPI(endpoint: string, param: Record<string, any> = {}) {
     return data
 }
 
-// Function to update DNS records
-async function updateDnsRecords(configFile: string) {
-    const domainname = basename(configFile);
-    console.log(`Updating ${domainname}...`)
-
-    const configContent = await readFile(configFile, 'utf-8')
-    const config = configContent
-        .split('\n')
-        .reduce((acc, line) => {
-            const [key, val] = line.split('=')
-            if (key && val) {
-                acc[key.trim()] = val.trim().replace('\r', '')
-            }
-            return acc
-        }, {} as Record<string, string>)
-    const apipassword = config['NETCUP_API_PASSWORD']
-    const customernumber = config['NETCUP_CUSTOMER_NUMBER']
-    const apikey = config['NETCUP_API_KEY']
-    const hostname = config['NETCUP_HOSTNAME'] ?? '@'
+async function updateDnsRecords(domain: string, account: Account) {
+    const {apiKey: apikey, apiPassword: apipassword, customerNumber: customernumber} = account
+    const {domainname, hostname} = parseDomain(domain)
+    console.log(`Updating ${domainname} (${hostname})...`)
 
     const loginData = await netcupAPI('login', {apipassword, apikey, customernumber})
     const apisessionid = loginData.responsedata?.apisessionid
@@ -76,7 +93,6 @@ async function updateDnsRecords(configFile: string) {
     await netcupAPI('logout', {apisessionid, customernumber, apikey})
 }
 
-// Function to check if the IP has changed
 async function checkIp() {
     const newIpResponse = await fetch('https://api.ipify.org')
     const newIp = await newIpResponse.text()
@@ -85,16 +101,15 @@ async function checkIp() {
         console.log(`[${new Date().toISOString()}] New IP: ${newIp}`)
         await writeFile(previousIpFile, newIp)
         currentIp = newIp
-        const configFiles = (await readdir(configDir)).map(file => join(configDir, file))
-        for (const configFile of configFiles) {
-            await updateDnsRecords(configFile)
+        for (const account of config) {
+            for (const domain of account.domains) {
+                await updateDnsRecords(domain, account)
+            }
         }
     }
 }
 
-// Log current time for debugging
 console.log(`Started: ${new Date().toISOString()}`)
 
-// Check for IP change every minute
 checkIp()
 setInterval(checkIp, 60 * 1000)
