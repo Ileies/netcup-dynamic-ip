@@ -1,8 +1,5 @@
-const { join } = require('path');
-const packageJson = require('./package.json');
-
 module.exports = {
-  name: packageJson.name,
-  script: join(__dirname, packageJson.module),
-  interpreter: "bun"
+    name: 'ip-monitor',
+    script: 'bun',
+    args: 'run /var/ip-monitor/out/index.js',
 };
