@@ -1,4 +1,5 @@
 import {readFile, writeFile} from 'fs/promises'
+import {join} from 'path'
 
 interface Account {
     apiKey: string
@@ -10,7 +11,7 @@ interface Account {
 type Config = Account[]
 
 const args = process.argv.slice(2)
-let configPath = './config.json'
+let configPath = join(import.meta.dir, '..', 'config.json')
 for (let i = 0; i < args.length; i++) {
     if ((args[i] === '--config' || args[i] === '-c') && args[i + 1]) {
         configPath = args[++i]
@@ -27,7 +28,7 @@ try {
     process.exit(1)
 }
 
-const previousIpFile = './ip.txt'
+const previousIpFile = join(import.meta.dir, '..', 'ip.txt')
 
 let currentIp: string
 try {
