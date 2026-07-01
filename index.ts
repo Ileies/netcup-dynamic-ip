@@ -55,7 +55,11 @@ async function netcupAPI(endpoint: string, param: Record<string, any> = {}) {
         body: JSON.stringify({action: endpoint, param})
     })
     const data = await rawData.json()
-    console.log(data)
+    const status = data.status === 'success' ? 'OK' : `FEHLER (${data.statuscode})`
+    console.log(`  ${data.action}: ${status} - ${data.shortmessage}`)
+    if (data.responsedata?.dnsrecords) {
+        console.log('  dnsrecords:', JSON.stringify(data.responsedata.dnsrecords, null, 2).replace(/^/gm, '  '))
+    }
     return data
 }
 
@@ -95,8 +99,14 @@ async function updateDnsRecords(domain: string, account: Account) {
 }
 
 async function checkIp() {
-    const newIpResponse = await fetch('https://api.ipify.org')
-    const newIp = await newIpResponse.text()
+    let newIp: string
+    try {
+        const newIpResponse = await fetch('https://api.ipify.org')
+        newIp = await newIpResponse.text()
+    } catch (e) {
+        console.error(`[${new Date().toISOString()}] Failed to fetch IP:`, e)
+        return
+    }
 
     if (!currentIp || newIp !== currentIp) {
         console.log(`[${new Date().toISOString()}] New IP: ${newIp}`)
