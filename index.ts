@@ -58,7 +58,9 @@ async function netcupAPI(endpoint: string, param: Record<string, any> = {}) {
     const status = data.status === 'success' ? 'OK' : `FEHLER (${data.statuscode})`
     console.log(`  ${data.action}: ${status} - ${data.shortmessage}`)
     if (data.responsedata?.dnsrecords) {
-        console.log('  dnsrecords:', JSON.stringify(data.responsedata.dnsrecords, null, 2).replace(/^/gm, '  '))
+        for (const r of data.responsedata.dnsrecords.filter((r: any) => r.type === 'A')) {
+            console.log(`    A     ${r.hostname.padEnd(20)} ${r.destination}`)
+        }
     }
     return data
 }
