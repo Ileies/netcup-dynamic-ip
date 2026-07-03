@@ -52,7 +52,8 @@ async function netcupAPI(endpoint: string, param: Record<string, any> = {}) {
     const rawData = await fetch('https://ccp.netcup.net/run/webservice/servers/endpoint.php?JSON', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({action: endpoint, param})
+        body: JSON.stringify({action: endpoint, param}),
+        signal: AbortSignal.timeout(15_000)
     })
     const data = await rawData.json()
     console.log(data)
@@ -95,7 +96,7 @@ async function updateDnsRecords(domain: string, account: Account) {
 }
 
 async function checkIp() {
-    const newIpResponse = await fetch('https://api.ipify.org')
+    const newIpResponse = await fetch('https://api.ipify.org', {signal: AbortSignal.timeout(10_000)})
     const newIp = await newIpResponse.text()
 
     if (!currentIp || newIp !== currentIp) {
@@ -110,7 +111,10 @@ async function checkIp() {
     }
 }
 
-console.log(`Started: ${new Date().toISOString()}`)
+async function run() {
+    await checkIp().catch(console.error)
+    setTimeout(run, 60 * 1000)
+}
 
-checkIp()
-setInterval(checkIp, 60 * 1000)
+console.log(`Started: ${new Date().toISOString()}`)
+run()
